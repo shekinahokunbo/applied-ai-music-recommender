@@ -9,3 +9,17 @@ id,title,artist,genre,mood,energy,tempo_bpm,valence,danceability,acousticness
 8,Night Drive Loop,Neon Echo,synthwave,moody,0.75,110,0.49,0.73,0.22
 9,Focus Flow,LoRoom,lofi,focused,0.40,80,0.59,0.60,0.78
 10,Rooftop Lights,Indigo Parade,indie pop,happy,0.76,124,0.81,0.82,0.35
+11,Concrete Kings,Blockwise,hip-hop,energetic,0.85,95,0.70,0.90,0.08
+12,Elegy in Blue,Camille Sorrel,classical,melancholic,0.25,66,0.28,0.20,0.95
+13,Neon Overdrive,Pulsewave,edm,euphoric,0.95,128,0.88,0.92,0.03
+14,Dust and Dirt Roads,Hollow Pines,country,nostalgic,0.55,100,0.60,0.55,0.70
+15,Velvet Hours,Sable Moon,r&b,romantic,0.50,92,0.75,0.70,0.35
+16,Iron Verdict,Ashen Crown,metal,angry,0.98,160,0.30,0.45,0.02
+17,Paper Boats,Wren Hollow,folk,sad,0.30,76,0.25,0.35,0.90
+18,Island Time,Sunset Groove,reggae,uplifting,0.60,98,0.82,0.75,0.40
+19,Rainwater Blues,Delta Mabry,blues,bittersweet,0.45,84,0.40,0.50,0.60
+20,Groove Machine,Funk Theory,funk,groovy,0.80,112,0.85,0.90,0.15
+21,Higher Ground,The Revival Choir,soul,hopeful,0.55,96,0.72,0.60,0.45
+22,Basement Signal,Null Sector,techno,dark,0.90,130,0.35,0.85,0.04
+23,Disco Fever,Mirrorball Kids,disco,playful,0.85,120,0.90,0.95,0.10
+24,Sunday Anthem,Grace Harmony,gospel,triumphant,0.70,104,0.88,0.50,0.55
