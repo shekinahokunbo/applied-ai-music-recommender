@@ -39,7 +39,12 @@ Full code: `src/ai_pipeline.py`. Full diagram: `diagrams/architecture.mmd`.
 
 ## 4. Data
 
-`data/songs.csv` -- 24 fictional songs, 10 fields each (id, title, artist, genre, mood, energy, tempo_bpm, valence, danceability, acousticness). 21 distinct genres, 20 distinct moods across the catalog -- deliberately broad and imbalanced by real-world standards (this is a teaching catalog, not a representative music library). No lyrics, no real listening history, no user data of any kind is collected or stored by this system.
+Two source files, both fictional and both fully committed to this repo:
+
+- **`data/songs.csv`** -- 24 fictional songs, 10 structured fields each (id, title, artist, genre, mood, energy, tempo_bpm, valence, danceability, acousticness). 21 distinct genres, 20 distinct moods -- deliberately broad and imbalanced by real-world standards (this is a teaching catalog, not a representative music library). This is what the deterministic scorer ranks against.
+- **`data/song_notes.csv`** -- one short free-text "curator liner note" per song, keyed by song id. This is the second RAG source: unstructured, narrative content that the explanation step retrieves and grounds against, separately from the numeric attributes above. Added specifically for the RAG Enhancement stretch goal (see README).
+
+No lyrics, no real listening history, no user data of any kind is collected or stored by this system.
 
 ---
 
@@ -47,15 +52,15 @@ Full code: `src/ai_pipeline.py`. Full diagram: `diagrams/architecture.mmd`.
 
 Both explanations below were generated in the **same pipeline run** against the **same retrieved songs** for the request `"upbeat pop for a workout"` -- only the system prompt (`BASELINE_SYSTEM_PROMPT` vs `PERSONA_SYSTEM_PROMPT`, the latter few-shot-prompted with one worked example of the desired DJ voice) differs.
 
-**Baseline** (`src/ai_pipeline.py`, no `--persona` flag):
+**Baseline** (`src/ai_pipeline.py`, no `--persona` flag, real captured output):
 
-> These recommendations are strong matches for an upbeat pop workout playlist. Sunrise City and Gym Hero both score highest with exact pop genre matches and energy levels closely aligned to your 0.8 target (0.82 and 0.93 respectively)...
+> These recommendations prioritize upbeat pop tracks with high energy levels suited for workout motivation. Sunrise City (energy 0.82, happy mood) and Gym Hero (energy 0.93, intense mood) are the strongest matches -- the latter is explicitly designed for treadmill sync with its metronome-tight kick drum. The other picks blend in complementary high-energy genres: Concrete Kings brings hip-hop intensity (0.85 energy), Groove Machine offers funk-driven momentum (0.80 energy with a driving bassline), and Rooftop Lights rounds out the list with indie-pop positivity (0.76 energy). All five tracks cluster in the 0.76-0.93 energy range, making them collectively effective for sustained workout pacing.
 
 **Persona** (`--persona` flag, real captured output):
 
-> Alright, lacing up with you -- **Sunrise City** is your opener, pure pop sunshine at 0.82 energy to get you moving. **Gym Hero** is right behind it at nearly full throttle (0.93 energy), and that's where things get serious -- both are straight-up pop, so you're locked in on genre. Fair warning though: after those two, the rest drift toward hip-hop, funk, and indie pop, so if you want that pure upbeat pop vibe for the full session, these first two are your main event.
+> Alright, lacing up with you -- Sunrise City is your opener, pure pop sunshine with that 0.82 energy to get you moving, and Gym Hero right behind it if you need to kick it up to 0.93 for the hard push (the curator's right, that kick drum is *built* for syncing with your stride). Both nail the upbeat pop you asked for, so you're in good hands here.
 
-**Measurable differences:** the persona output uses second-person direct address ("lacing up with you"), informal contractions and radio-host phrasing ("that's where things get serious," "your main event"), bold emphasis on song titles, and an exclamation-free but energetic register -- none of which appear in the baseline. Both outputs are equally grounded (same songs, same scores, same honesty about genre drift in the lower results) -- the persona prompt changed *style*, not *substance* or *accuracy*, which is exactly the intended effect of structured/constrained-tone prompting: control the voice without opening the door to invented facts.
+**Measurable differences:** the persona output uses second-person direct address ("lacing up with you"), informal contractions and radio-host phrasing ("the hard push," "you're in good hands"), and an exclamation-free but energetic register -- none of which appear in the baseline. Notably, the persona voice even folds a curator-note fact into its own idiom ("the curator's right, that kick drum is built for syncing with your stride" -- drawn from Gym Hero's real liner note), showing that specialization changes *delivery*, not *what's true*: both voices are equally grounded in the same two real data sources, and the persona prompt changed *style*, not *substance* or *accuracy* -- exactly the intended effect of structured/constrained-tone prompting.
 
 ---
 

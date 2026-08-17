@@ -125,6 +125,22 @@ def _client() -> Anthropic:
     return Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
 
+def load_song_notes(csv_path: str = "data/song_notes.csv") -> Dict[str, str]:
+    """
+    Second retrieval source (RAG multi-source enhancement): free-text curator
+    liner notes, keyed by song id, separate from the structured attribute
+    catalog in data/songs.csv. Returns {} if the file is missing so the
+    pipeline degrades gracefully rather than failing.
+    """
+    notes: Dict[str, str] = {}
+    if not os.path.exists(csv_path):
+        return notes
+    with open(csv_path, newline="", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            notes[row["id"]] = row["note"]
+    return notes
+
+
 def _catalog_genres_and_moods(songs: List[Dict]) -> Tuple[List[str], List[str]]:
     genres = sorted({s["genre"] for s in songs})
     moods = sorted({s["mood"] for s in songs})
@@ -269,14 +285,32 @@ def call_claude_critique(client: Anthropic, user_text: str, profile: Dict, recom
 
 
 def call_claude_explain(
-    client: Anthropic, user_text: str, profile: Dict, recommendations: List, persona: bool
+    client: Anthropic,
+    user_text: str,
+    profile: Dict,
+    recommendations: List,
+    persona: bool,
+    notes: Optional[Dict[str, str]] = None,
 ) -> str:
-    songs_summary = "\n".join(
-        f"{i+1}. {s['title']} by {s['artist']} -- genre={s['genre']}, mood={s['mood']}, "
-        f"energy={s['energy']}, score={score:.2f}"
-        for i, (s, score, _) in enumerate(recommendations)
-    )
+    notes = notes or {}
+    lines = []
+    for i, (s, score, _) in enumerate(recommendations):
+        line = (
+            f"{i+1}. {s['title']} by {s['artist']} -- genre={s['genre']}, mood={s['mood']}, "
+            f"energy={s['energy']}, score={score:.2f}"
+        )
+        note = notes.get(str(s.get("id")))
+        if note:
+            line += f'\n   curator note: "{note}"'
+        lines.append(line)
+    songs_summary = "\n".join(lines)
+
     system = PERSONA_SYSTEM_PROMPT if persona else BASELINE_SYSTEM_PROMPT
+    system += (
+        "\n\nEach song may include a curator note (a second, independent source of real "
+        "information about the track). You may reference a curator note's content if it's "
+        "relevant, but never invent one -- only use notes exactly as given."
+    )
     user_content = f"Listener's request: {user_text!r}\n\nRecommended songs:\n{songs_summary}"
     response = client.messages.create(
         model=MODEL,
@@ -311,6 +345,7 @@ def run_pipeline(user_text: str, songs: List[Dict], persona: bool = False, k: in
 
     client = _client()
     api_ok = True
+    notes = load_song_notes()
 
     # Step 1: PLAN / PARSE
     try:
@@ -367,10 +402,13 @@ def run_pipeline(user_text: str, songs: List[Dict], persona: bool = False, k: in
         except Exception as exc:  # noqa: BLE001
             trace.append({"step": "critique", "error": str(exc), "skipped": True})
 
-    # Step 6: EXPLAIN (grounded generation)
+    # Step 6: EXPLAIN (grounded generation, multi-source: structured catalog + curator notes)
     try:
-        explanation = call_claude_explain(client, user_text, profile, recommendations, persona=persona)
-        trace.append({"step": "explain", "persona": persona})
+        explanation = call_claude_explain(
+            client, user_text, profile, recommendations, persona=persona, notes=notes
+        )
+        matched_notes = [s["title"] for s, _, _ in recommendations if str(s.get("id")) in notes]
+        trace.append({"step": "explain", "persona": persona, "notes_retrieved_for": matched_notes})
     except Exception as exc:  # noqa: BLE001
         explanation = (
             f"Here are your top {len(recommendations)} matches based on {profile}. "

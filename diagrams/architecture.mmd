@@ -34,11 +34,13 @@ flowchart TD
         RERETRIEVE --> EXPLAIN
         DECIDE -- no --> EXPLAIN
 
-        EXPLAIN["Step 6: EXPLAIN (grounded generation)\nClaude writes a 2-4 sentence explanation\ngrounded ONLY in the actually-retrieved\nsongs/scores -- baseline or DJ-persona tone"]
+        EXPLAIN["Step 6: EXPLAIN (multi-source grounded generation)\nClaude writes a 2-4 sentence explanation\ngrounded ONLY in the actually-retrieved\nsongs/scores AND their curator notes\n-- baseline or DJ-persona tone"]
     end
 
-    CATALOG[("data/songs.csv\n24 songs x 10 attributes")]
+    CATALOG[("Source A: data/songs.csv\n24 songs x 10 structured attributes")]
+    NOTES[("Source B: data/song_notes.csv\nfree-text curator liner notes,\nkeyed by song id")]
     CATALOG -.-> RETRIEVE
+    NOTES -. "looked up for each\nretrieved song's id" .-> EXPLAIN
 
     EXPLAIN --> OUT["Final output:\nranked songs + scores + reasons\n+ confidence + AI explanation"]
     REJECT --> OUT
@@ -66,4 +68,5 @@ flowchart TD
     style GUARD1 fill:#fdecea,stroke:#c0392b
     style EVAL fill:#e8f4fd,stroke:#2874a6
     style CATALOG fill:#eaf7ea,stroke:#2e7d32
+    style NOTES fill:#eaf7ea,stroke:#2e7d32
     style TRACE fill:#eaf7ea,stroke:#2e7d32

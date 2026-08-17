@@ -8,7 +8,7 @@ This project extends **Music Recommender Simulation** (VibeMatch 1.0), originall
 
 This project adds a real AI layer on top of that deterministic core, using the [Claude API](https://www.anthropic.com/api) (`claude-haiku-4-5`):
 
-1. **A RAG (Retrieval-Augmented Generation) front end.** Users type a free-text mood/request instead of filling out a form. Claude parses that text into a structured taste profile (the "R" -- nothing is generated without first retrieving real rows from the catalog), the *original, unmodified* deterministic scorer retrieves and ranks the actual songs, and Claude writes a natural-language explanation grounded strictly in those retrieved songs' real attributes -- it is instructed never to invent a song, artist, or fact.
+1. **A RAG (Retrieval-Augmented Generation) front end, from two sources.** Users type a free-text mood/request instead of filling out a form. Claude parses that text into a structured taste profile (the "R" -- nothing is generated without first retrieving real rows from the catalog), the *original, unmodified* deterministic scorer retrieves and ranks the actual songs from `data/songs.csv`, and a second lookup pulls each retrieved song's free-text curator liner note from a separate file, `data/song_notes.csv`. Claude's final explanation is grounded strictly in both real sources -- it is instructed never to invent a song, artist, attribute, or note.
 2. **A lightweight agentic loop.** The pipeline doesn't stop at one shot: Claude *critiques* its own retrieval against the original request, assigns a confidence score, and -- if confidence is low -- proposes an adjusted profile and re-retrieves once before generating the final explanation. This plan -> act -> critique -> re-act -> explain chain is a real decision-making loop, not a single API call.
 3. **A specialization/persona layer.** The explanation step can run in a neutral "baseline" voice or a constrained "Vibe the DJ" persona (few-shot-prompted radio-host tone), demonstrating measurable, structured-prompting-driven style control. See [`model_card.md`](model_card.md) for a baseline-vs-persona comparison.
 4. **A reliability harness.** Input validation, output guardrails (energy clamped to `[0,1]`, hallucinated fields dropped), an offline keyword-matching fallback if the Claude API is unreachable, and an automated evaluation script (`src/eval_ai.py`) that runs the pipeline against normal, adversarial, and edge-case inputs and checks the results against explicit pass/fail criteria.
@@ -21,7 +21,7 @@ The original deterministic recommender (`src/recommender.py`, `src/main.py`, `sr
 
 Full source diagram: [`diagrams/architecture.mmd`](diagrams/architecture.mmd) (Mermaid source -- the required artifact; render it in any Mermaid-compatible viewer, e.g. the [Mermaid Live Editor](https://mermaid.live)). A rendered PNG export is also included at [`assets/architecture.png`](assets/architecture.png) for quick viewing, but the `.mmd` source is authoritative.
 
-**Data flow, in words:** a free-text request goes through an input-validation guardrail, then Claude parses it into a structured profile using a forced JSON schema (falling back to offline keyword matching if the API call fails). That profile is sanitized (`validate_profile`) before it ever reaches the scoring engine. The **unmodified Module 1-3 scorer** retrieves and ranks the real song catalog against the profile. Claude then critiques its own retrieval against the user's original request and, if confidence is low, proposes an adjusted profile and the retrieval step runs again. Finally, Claude writes an explanation grounded only in the actually-retrieved songs. Every step is appended to a trace that's printed to the terminal and logged to `logs/agent_traces.jsonl`.
+**Data flow, in words:** a free-text request goes through an input-validation guardrail, then Claude parses it into a structured profile using a forced JSON schema (falling back to offline keyword matching if the API call fails). That profile is sanitized (`validate_profile`) before it ever reaches the scoring engine. The **unmodified Module 1-3 scorer** retrieves and ranks the real song catalog (Source A: `data/songs.csv`) against the profile. Claude then critiques its own retrieval against the user's original request and, if confidence is low, proposes an adjusted profile and the retrieval step runs again. For the final step, a second lookup retrieves each recommended song's curator liner note (Source B: `data/song_notes.csv`), and Claude writes an explanation grounded only in what was actually retrieved from *both* sources. Every step is appended to a trace that's printed to the terminal and logged to `logs/agent_traces.jsonl`.
 
 ```
 User free text
@@ -36,7 +36,7 @@ User free text
 [2. VALIDATE]  clamp/sanitize -- guardrail before scoring
       |
       v
-[3. RETRIEVE]  deterministic recommend_songs() over data/songs.csv
+[3. RETRIEVE]  deterministic recommend_songs() over data/songs.csv  (Source A)
       |
       v
 [4. CRITIQUE]  Claude scores its own retrieval -> confidence + optional fix
@@ -45,7 +45,9 @@ User free text
 [5. RE-RETRIEVE]  recommend_songs() again with the adjusted profile
       |
       v
-[6. EXPLAIN]  Claude writes a grounded explanation (baseline or persona voice)
+[6. EXPLAIN]  look up curator notes (Source B: data/song_notes.csv) for the
+              retrieved songs, then Claude writes a grounded explanation
+              from both sources (baseline or persona voice)
       |
       v
 Ranked songs + scores + reasons + confidence + explanation
@@ -105,7 +107,7 @@ python -m src.eval_ai  # live evaluation harness against the Claude API
 
 These are real, reproducible transcripts from `python -m src.ai_main "<query>"` -- not hand-written examples.
 
-### Example 1 -- nuanced request with a self-correction
+### Example 1 -- nuanced request with a self-correction, grounded in two sources
 
 ```
 $ python -m src.ai_main "I want something moody for a rainy commute, not too aggressive"
@@ -117,10 +119,11 @@ $ python -m src.ai_main "I want something moody for a rainy commute, not too agg
 [validate] {'profile': {'genre': None, 'mood': 'moody', 'energy': 0.3, 'likes_acoustic': None}}
 [retrieve] {'top_songs': ['Night Drive Loop', 'Paper Boats', 'Spacewalk Thoughts',
   'Library Rain', 'Elegy in Blue']}
-[critique] {'confidence': 0.62, 'matches_request': False, 'issue': "Top result 'Night Drive
-  Loop' has energy 0.75, which contradicts 'not too aggressive' requirement...",
-  'adjusted_mood': 'melancholic', 'adjusted_energy': 0.3, 'adjusted_likes_acoustic': True}
-[explain] {'persona': False}
+[critique] {'confidence': 0.62, 'matches_request': False, 'issue': "Top-ranked song 'Night
+  Drive Loop' has energy 0.75, which contradicts the 'not too aggressive' requirement...",
+  'adjusted_mood': 'moody', 'adjusted_energy': 0.25, 'adjusted_likes_acoustic': None}
+[explain] {'persona': False, 'notes_retrieved_for': ['Night Drive Loop', 'Paper Boats',
+  'Spacewalk Thoughts', 'Library Rain', 'Elegy in Blue']}
 
 --- Recommendations (confidence: 0.62) ---
 1. Night Drive Loop by Neon Echo  (score: 1.55)
@@ -132,17 +135,20 @@ $ python -m src.ai_main "I want something moody for a rainy commute, not too agg
 5. Elegy in Blue by Camille Sorrel  (score: 0.95)
 
 --- AI explanation ---
-These recommendations balance your mood and energy requirements well. The top picks--Night
-Drive Loop, Paper Boats, and Spacewalk Thoughts--all match your request for moody atmosphere
-with low aggression (energy levels 0.28-0.75), while Library Rain and Elegy in Blue add
-gentle, contemplative options perfect for a rainy commute. ... Note that Night Drive Loop has
-slightly higher energy than the others, so if you want maximum subtlety, the ambient and lofi
-tracks might suit your commute even better.
+Night Drive Loop by Neon Echo is your best match--it delivers the moody atmosphere you want
+with synthwave production that's engaging without being aggressive, and its moderate 0.75
+energy level suits a commute perfectly. If you prefer something even more understated, Paper
+Boats by Wren Hollow or Library Rain by Paper Lanterns both offer gentle, introspective
+vibes: the former is an intimate folk whisper about water and loss, while the latter
+actually incorporates field recordings of rain layered under piano, making it thematically
+perfect for a rainy day. Spacewalk Thoughts by Orbit Bloom is another solid option with its
+train-window-gazing ambient quality, though it's slightly less weather-matched than the
+rain-themed alternatives.
 ```
 
-Notice the agent **caught its own mismatch**: the critique step flagged that the #1 result contradicted "not too aggressive," and the final explanation honestly surfaces that caveat instead of overselling the match. Confidence (0.62) reflects that imperfection.
+Two things to notice: (1) the agent **caught its own mismatch** -- the critique step flagged that the #1 result contradicted "not too aggressive," and confidence (0.62) reflects that imperfection; (2) the explanation is grounded in **both** data sources -- "field recordings of rain layered under piano" is a real line from `data/song_notes.csv`, not invented, and it was retrieved specifically because Library Rain was in the top-5.
 
-### Example 2 -- persona mode (specialization)
+### Example 2 -- persona mode (specialization), also citing a curator note
 
 ```
 $ python -m src.ai_main "upbeat pop for a workout" --persona
@@ -155,20 +161,20 @@ $ python -m src.ai_main "upbeat pop for a workout" --persona
 5. Rooftop Lights by Indigo Parade  (score: 0.96)
 
 --- AI explanation ---
-Alright, lacing up with you -- **Sunrise City** is your opener, pure pop sunshine at 0.82
-energy to get you moving. **Gym Hero** is right behind it at nearly full throttle (0.93
-energy), and that's where things get serious -- both are straight-up pop, so you're locked
-in on genre. Fair warning though: after those two, the rest drift toward hip-hop, funk, and
-indie pop, so if you want that pure upbeat pop vibe for the full session, these first two
-are your main event.
+Alright, lacing up with you -- Sunrise City is your opener, pure pop sunshine with that 0.82
+energy to get you moving, and Gym Hero right behind it if you need to kick it up to 0.93 for
+the hard push (the curator's right, that kick drum is built for syncing with your stride).
+Both nail the upbeat pop you asked for, so you're in good hands here.
 ```
+
+("that kick drum is built for syncing with your stride" is drawn directly from Gym Hero's curator note.)
 
 ### Example 3 -- clean high-confidence match
 
 ```
 $ python -m src.ai_main "chill lofi for late night coding"
 
---- Recommendations (confidence: 0.92) ---
+--- Recommendations (confidence: 0.82) ---
 1. Library Rain by Paper Lanterns  (score: 3.95)
 2. Midnight Coding by LoRoom  (score: 3.88)
 3. Focus Flow by LoRoom  (score: 2.90)
@@ -176,14 +182,16 @@ $ python -m src.ai_main "chill lofi for late night coding"
 5. Paper Boats by Wren Hollow  (score: 1.00)
 
 --- AI explanation ---
-These recommendations prioritize lofi tracks with chill moods that match your late-night
-coding session perfectly. **Library Rain** and **Midnight Coding** both score highest with
-the exact genre and mood you requested... The remaining suggestions drift from your core
-request--Spacewalk Thoughts shifts to ambient and Paper Boats to folk--so the top three
-tracks should best serve your needs.
+The top two recommendations directly match your request: Library Rain and Midnight Coding
+are both lofi tracks with chill moods and low energy (0.35-0.42), perfect for late-night
+focus. Midnight Coding is especially tailored to coding sessions--it was intentionally
+written for 2 a.m. debugging with a soft beat designed not to distract. Library Rain offers
+a similar vibe with rain field recordings layered under piano... The remaining suggestions
+drift further from your needs: Focus Flow is lofi but leans "focused" rather than "chill,"
+while Spacewalk Thoughts and Paper Boats shift into ambient and folk genres respectively.
 ```
 
-Note the consistent behavior across all three: every run produces a validated structured profile, a real ranked retrieval from the actual catalog, a numeric confidence score, and an explanation that never references a song outside the retrieved list.
+Note the consistent behavior across all three: every run produces a validated structured profile, a real ranked retrieval from the actual catalog, a second real-data lookup against the curator-notes source, a numeric confidence score, and an explanation that never references a song or fact outside what was actually retrieved.
 
 ---
 
@@ -200,12 +208,12 @@ Note the consistent behavior across all three: every run produces a validated st
 
 [PASS] Normal: chill lofi for studying
        [OK] profile is a dict with expected keys -- {'genre': 'lofi', 'mood': 'chill',
-            'energy': 0.2, 'likes_acoustic': True}
+            'energy': 0.3, 'likes_acoustic': True}
        [OK] confidence is None or within [0, 1] -- confidence=0.82
        [OK] explanation is grounded (mentions a retrieved song) -- mentions a real song title
 
 [PASS] Normal: upbeat pop workout
-       [OK] confidence is None or within [0, 1] -- confidence=0.85
+       [OK] confidence is None or within [0, 1] -- confidence=0.82
 
 [PASS] Normal: nuanced mood + constraint
        [OK] confidence is None or within [0, 1] -- confidence=0.62
@@ -232,7 +240,7 @@ Note the consistent behavior across all three: every run produces a validated st
 
 ==============================================================================
   Summary: 6/7 cases fully passed (37/38 individual checks passed)
-  Average agent confidence across runs: 0.41
+  Average agent confidence across runs: 0.43
 ==============================================================================
 ```
 
@@ -273,12 +281,12 @@ Note the consistent behavior across all three: every run produces a validated st
 
 | Feature | Where | Evidence |
 |---|---|---|
-| **RAG Enhancement** | `src/ai_pipeline.py` `run_pipeline()` | The retrieval step is grounded against the real, live-loaded `data/songs.csv` catalog (not a static/mocked source), and the generation step is instructed and verified (via `eval_ai.py`'s grounding check) never to reference a song outside that retrieval. See the before/after impact note below. |
+| **RAG Enhancement** | `src/ai_pipeline.py` `run_pipeline()`, `load_song_notes()` | Retrieval draws from **two independent sources**: the structured attribute catalog (`data/songs.csv`) that drives scoring/ranking, and a separate free-text curator-notes corpus (`data/song_notes.csv`) looked up per retrieved song and passed into the explanation step. The generation step is instructed, and automatically checked (`eval_ai.py`'s grounding check), never to reference a song or note that wasn't actually retrieved. See the before/after impact note below. |
 | **Agentic Workflow Enhancement** | `src/ai_pipeline.py` critique/re-retrieve steps | Multi-step plan -> act -> critique -> conditional re-act -> explain chain with real decision logic (`confidence < 0.5` gate). Full reasoning traces committed at `logs/agent_traces.jsonl` and documented in [`ai_interactions.md`](ai_interactions.md). |
 | **Fine-Tuning / Specialization** | `src/ai_pipeline.py` `PERSONA_SYSTEM_PROMPT` vs `BASELINE_SYSTEM_PROMPT` | Few-shot-prompted persona ("Vibe the DJ") vs a neutral baseline voice, run on the *same* retrieved data. Baseline-vs-specialized comparison in [`model_card.md`](model_card.md). |
 | **Test Harness / Evaluation Script** | `src/eval_ai.py` | Runs 7 predefined inputs, prints a pass/fail table plus a summary line and average confidence score (see the Reliability section above). |
 
-**RAG before/after:** *Before* this stretch work, the system's only "retrieval" was a single hardcoded profile (`{"genre": "pop", "mood": "happy", "energy": 0.8}`) baked into `src/main.py` -- there was no way to query the catalog with anything but that one fixed profile, and no natural-language interface at all. *After*, any free-text mood/request is grounded against a live, dynamically-loaded read of the full 24-song catalog (genres and moods are read from the CSV at request time and given to Claude as context, so the extraction step always reflects the *current* catalog, not a hardcoded list) -- the system can now answer requests the original developer never anticipated, while every recommendation remains fully traceable to real catalog rows and the original scoring formula.
+**RAG before/after:** *Before* this stretch work, the system's only "retrieval" was a single hardcoded profile (`{"genre": "pop", "mood": "happy", "energy": 0.8}`) baked into `src/main.py`, and the only source it ever touched was the numeric attribute CSV -- there was no natural-language interface and no source beyond structured scores. *After*, any free-text mood/request is grounded against **two live, dynamically-loaded sources**: the full 24-song attribute catalog (genres/moods are read from the CSV at request time, so extraction always reflects the *current* catalog, not a hardcoded list) for scoring and ranking, plus a separate curator-notes corpus for narrative grounding. The measurable effect shows up directly in the explanations: the "chill lofi for late night coding" example above now says *"[Midnight Coding] was intentionally written for 2 a.m. debugging with a soft beat designed not to distract"* -- a real fact from the second source that the numeric-attributes-only version of this pipeline had no way to know or say. Every claim in the explanation remains traceable to one of the two real source files; nothing is invented.
 
 ---
 
