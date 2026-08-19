@@ -55,6 +55,39 @@ Ranked songs + scores + reasons + confidence + explanation
 
 ---
 
+## Live Demo (Streamlit)
+
+[`streamlit_app.py`](streamlit_app.py) is a standalone web front end for the AI pipeline -- type a
+free-text vibe, optionally toggle the "Vibe the DJ" persona, and see the ranked songs, confidence
+score, grounded explanation, and a step-by-step view of the agent's reasoning (parse -> validate ->
+retrieve -> critique -> re-retrieve -> explain), all in the browser. No terminal required.
+
+**Run it locally:**
+
+```bash
+pip install -r requirements.txt
+streamlit run streamlit_app.py
+```
+
+It reads `ANTHROPIC_API_KEY` from `.env` (see setup below) the same way the CLI does.
+
+**Deploy it for free so recruiters can try it live (Streamlit Community Cloud):**
+
+1. Push this repo to GitHub (already done if you're reading this on GitHub).
+2. Go to [share.streamlit.io](https://share.streamlit.io) and sign in with GitHub.
+3. Click **New app**, pick this repo/branch, and set the main file path to `streamlit_app.py`.
+4. Under **Advanced settings -> Secrets**, add:
+   ```toml
+   ANTHROPIC_API_KEY = "sk-ant-..."
+   ```
+5. Deploy. You'll get a public `https://<something>.streamlit.app` URL -- that's what to link from
+   LinkedIn so people can use the app directly, no setup on their end.
+
+If no API key is configured, the app still works but falls back to the offline keyword-matching
+guardrail (`fallback_parse`) instead of crashing, and shows a banner explaining that.
+
+---
+
 ## Getting Started
 
 ### 1. Clone and set up a virtual environment
