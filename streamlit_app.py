@@ -317,9 +317,14 @@ if result:
         st.info(result["explanation"])
     else:
         if result.get("degraded"):
+            parse_error = next(
+                (step.get("error") for step in result["trace"] if step.get("step") == "parse" and step.get("error")),
+                None,
+            )
             st.info(
                 "The Claude API wasn't reachable for this request, so it fell back to "
-                "offline keyword matching (reliability guardrail, not a crash).",
+                "offline keyword matching (reliability guardrail, not a crash)."
+                + (f"\n\n**Underlying error:** `{parse_error}`" if parse_error else ""),
                 icon="🛟",
             )
 
