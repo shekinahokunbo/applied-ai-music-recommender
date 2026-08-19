@@ -38,7 +38,7 @@ try:
 except ModuleNotFoundError:
     from recommender import recommend_songs
 
-MODEL = "claude-haiku-4-5"
+MODEL = "claude-haiku-4-5-20251001"
 MAX_INPUT_CHARS = 500
 LOW_CONFIDENCE_THRESHOLD = 0.5
 
