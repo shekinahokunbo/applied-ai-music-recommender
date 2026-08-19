@@ -52,10 +52,8 @@ st.markdown(
     --ink: #f5f0ff;
     --muted: #b8a9d9;
 }
-
 html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 h1, h2, h3, .vm-title { font-family: 'Space Grotesk', sans-serif; }
-
 .stApp {
     background:
         radial-gradient(circle at 15% 0%, rgba(255,77,151,0.16), transparent 42%),
@@ -63,12 +61,10 @@ h1, h2, h3, .vm-title { font-family: 'Space Grotesk', sans-serif; }
         radial-gradient(circle at 50% 100%, rgba(157,78,221,0.18), transparent 55%),
         #0d0221;
 }
-
 section[data-testid="stSidebar"] {
     background: linear-gradient(180deg, #150730 0%, #0d0221 100%);
     border-right: 1px solid rgba(255,255,255,0.06);
 }
-
 /* Hero */
 .vm-hero {
     padding: 2.2rem 2.4rem;
@@ -102,7 +98,6 @@ section[data-testid="stSidebar"] {
     line-height: 1.1;
 }
 .vm-subtitle { color: var(--muted); font-size: 1.02rem; max-width: 640px; }
-
 .vm-badges { margin-top: 1.1rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .vm-badge {
     font-size: 0.76rem;
@@ -113,7 +108,6 @@ section[data-testid="stSidebar"] {
     padding: 0.3rem 0.7rem;
     border-radius: 999px;
 }
-
 /* Song cards */
 .vm-card {
     border-radius: 18px;
@@ -154,7 +148,6 @@ section[data-testid="stSidebar"] {
     margin-top: 0.6rem; font-size: 0.85rem; font-style: italic; color: #ffd7ea;
     border-left: 2px solid var(--pink); padding-left: 0.6rem;
 }
-
 /* Explanation / DJ quote panel */
 .vm-explain {
     border-radius: 18px; padding: 1.3rem 1.5rem; margin: 1.1rem 0 1.4rem 0;
@@ -166,13 +159,11 @@ section[data-testid="stSidebar"] {
     font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase;
     color: var(--cyan); font-weight: 700; margin-bottom: 0.5rem; display: block;
 }
-
 /* Confidence meter */
 .vm-conf-wrap { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.4rem; }
 .vm-conf-track { flex: 1; height: 10px; border-radius: 999px; background: rgba(255,255,255,0.08); overflow: hidden; }
 .vm-conf-fill { height: 100%; border-radius: 999px; }
 .vm-conf-label { font-weight: 700; font-size: 0.95rem; white-space: nowrap; }
-
 /* Trace timeline */
 .vm-step {
     display: flex; gap: 0.7rem; padding: 0.55rem 0;
@@ -182,10 +173,8 @@ section[data-testid="stSidebar"] {
 .vm-step-icon { font-size: 1.05rem; }
 .vm-step-name { font-weight: 700; color: var(--ink); font-size: 0.9rem; }
 .vm-step-detail { color: var(--muted); font-size: 0.83rem; margin-top: 0.1rem; }
-
 .vm-footer { text-align: center; color: var(--muted); font-size: 0.82rem; margin-top: 2.2rem; padding-top: 1.2rem; border-top: 1px solid rgba(255,255,255,0.08); }
 .vm-footer a { color: var(--cyan); text-decoration: none; }
-
 div.stButton > button {
     border-radius: 999px; font-weight: 600; border: 1px solid rgba(255,77,151,0.5);
 }
